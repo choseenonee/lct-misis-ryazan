@@ -1,5 +1,4 @@
 # lct-misis-ryazan
-# ML
 ## ml_with_backend
 Чтобы развернуть МЛ сервис, необходимо установить **python** версии 3.10 и выше, а так же, с помощью **pip**, установить зависимости из **requirements.txt**
 с помощью команды "**_pip install -r requirements.txt_**".
