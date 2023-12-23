@@ -8,7 +8,7 @@ import requests
 modelBERT = SentenceTransformer('cointegrated/rubert-tiny2')
 tokenizer_pers = BertTokenizer.from_pretrained("Minej/bert-base-personality")
 model_pers = BertForSequenceClassification.from_pretrained("Minej/bert-base-personality")
-df_pr = pd.read_csv("professions.csv", converters={'embs': lambda x: np.fromstring(x[1:-1], sep=' ')})
+df_pr = pd.read_csv("professions.csv", converters={'embs': lambda x: np.fromstring(x[1:-1], sep=', ')})
 
 
 class ProfModel:
@@ -32,6 +32,7 @@ class ProfModel:
                     "text": "Ты - суммаризатор названий групп, на которые подсписан пользователь социальной сети." + \
                             "Тебе на вход попадутся через пробел названия групп. Тебе нужно вывести небольшой текст" + \
                             "о пользователе, о его хобби и интересах на осове названий групп, на которые он подписан." + \
+                            "Не перечисляй названия групп пользователя, выводи только текст о его хобби и интересах, суммаризируй информацию о подписках."
                             "Я ожидаю текст на 15-20 предложений о человеке. "
 
                 },
@@ -42,24 +43,27 @@ class ProfModel:
             ]
         }
 
-        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completionAsync"
         headers = {
             "Content-Type": "application/json",
             "Authorization": "Api-Key AQVN2YEVAwzQEVNkYFZ7PrgPkCFO0xHDoglUW9Rw"
         }
 
         response = requests.post(url, headers=headers, json=prompt4gpt)
-        result = response.json().get("result").get('alternatives')[0].get("message").get("text")
+        # result = response.json().get("result").get('alternatives')[0].get("message").get("text")
+        print(response.json())
+        result = response.json().get("id")
         return result
 
     def personality_detection(self, text):
         inputs = self.tokenizer_pers(text, truncation=True, padding=True, return_tensors="pt")
         outputs = self.model_pers(**inputs)
-        predictions = outputs.logits.squeeze().detach().numpy()
+        logits = outputs.logits.squeeze().detach().numpy()
+        normalized_predictions = sigmoid(logits)
 
         label_names = ['Экстраверсия', 'Невротизм', 'Эмоциональная стабильность', 'Добросовестность',
                        'Открытость опыту']
-        result = {label_names[i]: predictions[i] for i in range(len(label_names))}
+        result = {label_names[i]: float(normalized_predictions[i]) for i in range(len(label_names))}
 
         return result
 
@@ -90,22 +94,35 @@ class ProfModel:
             ]
         }
 
-        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completionAsync"
         headers = {
             "Content-Type": "application/json",
             "Authorization": "Api-Key AQVN2YEVAwzQEVNkYFZ7PrgPkCFO0xHDoglUW9Rw"
         }
 
         response = requests.post(url, headers=headers, json=prompt4gpt)
-        result = response.json().get("result").get('alternatives')[0].get("message").get("text")
+        print(response.text)
+        # result = response.json().get("result").get('alternatives')[0].get("message").get("text")
+        result = response.json().get("id")
         return result
+
+    def get_responce(self, id):
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Api-Key AQVN2YEVAwzQEVNkYFZ7PrgPkCFO0xHDoglUW9Rw"
+        }
+        url = "https://llm.api.cloud.yandex.net/operations/" + id
+        response = requests.get(url, headers=headers)
+        while not response.json().get("done"):
+            response = requests.get(url, headers=headers)
+        text = response.json().get("response").get('alternatives')[0].get("message").get("text")
+        return text
 
     def return_pred(self, prompts):
         cos_sim = {}
         predicts = modelBERT.encode(prompts)
         for i in self.professionals.keys():
-            cos_sim[i] = cosine_similarity(np.array(self.professionals[i]).reshape(1, -1), predicts.reshape(1, -1))[0][0]
-
+            cos_sim[i] = float(cosine_similarity(np.array(self.professionals[i]).reshape(1, -1), predicts.reshape(1, -1))[0][0])
         sorted_keys = sorted(cos_sim.keys(), key=lambda x: cos_sim[x], reverse=True)  # Сортируем ключи словаря
         sorted_dict = {key: cos_sim[key] for key in sorted_keys}  # Создаем новый словарь с отсортированными ключами
         return sorted_dict
@@ -138,16 +155,20 @@ class ProfModel:
         return ans
 
     def predict(self, groups_text, person_text):
-        sum_group = self.summarize_yagpt(groups_text)
+        sum_group_id = self.summarize_yagpt(groups_text)
+        print(person_text)
         if person_text is not None:
             person_text = self.translate(person_text)
             bigfive = self.personality_detection(person_text)
-            sum_pers = self.personality_yagpt(str(bigfive))
+            sum_pers_id = self.personality_yagpt(str(bigfive))
         else:
-            sum_pers = None
-        sum_user = sum_group + (sum_pers if sum_pers is not None else "")
+            sum_pers_id = None
+        sum_group = self.get_responce(sum_group_id)
+        sum_pers = self.get_responce(sum_pers_id)
+        sum_user = str(sum_group + (sum_pers if sum_pers is not None else ""))
         preds = self.return_pred(sum_user)
-
         return preds, sum_group, sum_pers
 
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))

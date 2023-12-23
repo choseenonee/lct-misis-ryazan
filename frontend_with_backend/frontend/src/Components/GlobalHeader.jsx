@@ -1,28 +1,15 @@
 import React, { useState } from 'react'
 import { HiBars3BottomRight, HiOutlineXMark } from "react-icons/hi2";
 import MenuOverlay from './MenuOverlay';
-function Header() {
+function GlobalHeader() {
 
     const [toggle,setToggle]=useState(false)
     const menuList=[
-        {
-            id:1,
-            title:'МОЙ ПРОФИЛЬ'
-        },
-        {
-            id:2,
-            title:'ПОРТФОЛИО'
-        },
-        {
-          id:3,
-          title:'МОИ ПРОФЕССИИ'
-      },
-        
     ]
   return (
-    <div className='flex items-center justify-between' > 
+    <div className='flex items-center justify-between'>
         <div>
-            <h2 className='text-[24px] font-bold text-white'> <a href = "https://profilum.ru/" className='text-[24px] font-bold text-white hover:text-white '>Профилум</a>  
+        <h2 className='text-[24px] font-bold text-white'> <a href = "https://profilum.ru/" className='text-[24px] font-bold text-white hover:text-white '>Профилум</a>  
             <span className='text-blue-500'> VK</span></h2>
         </div>
         <div className='hidden md:flex gap-4'>
@@ -33,9 +20,9 @@ function Header() {
                     text-[15px] px-3 py-1 cursor-pointer'>{item.title}</h2>
                     </div>
             ))}
-            <h2 className='text-white 
+            <a href="https://ryazan.itatmisis.ru/login" className='text-white 
                     hover:border-[1px] border-blue-500 rounded-full 
-                    text-[15px] px-3 py-1 cursor-pointer hover:bg-gradient-to-r from-blue-500 to-blue-800 '> <a href = "http://ryazan.itatmisis.ru:8000/" className='text-[15px] px-2 py-1 text-white hover:text-white '>ВЫЙТИ</a> </h2>
+                    text-[15px] px-3 py-1 cursor-pointer hover:bg-gradient-to-r from-blue-500 to-blue-800 hover:text-white '>ВОЙТИ</a>
         </div>
         <div className='md:hidden'>
            {!toggle? <HiBars3BottomRight onClick={()=>setToggle(!toggle)} className='text-white text-[22px] cursor-pointer'/>
@@ -46,4 +33,4 @@ function Header() {
   )
 }
 
-export default Header
+export default GlobalHeader

@@ -1,0 +1,11 @@
+.progress-bar {
+  width: 100%;
+  background-color: #e0e0de;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.progress {
+  background-color: linear-gradient(to right , "#4caf50", "#81c784");
+  transition: width 0.3s ease;
+}

@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 import requests
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.parse import urlencode
@@ -12,6 +12,7 @@ import httpx
 import jwt
 
 from utils import apicommands
+
 
 app = FastAPI()
 
@@ -31,13 +32,16 @@ FRONTEND_URL = "http://ryazan.itatmisis.ru:8000"
 ML_URL = "http://158.160.28.36:8000/get_predict"
 
 
+fake_db = {"": 0}
+
+
 @app.get("/login")
 def login():
     params = {
         'client_id': CLIENT_ID,
         'redirect_uri': REDIRECT_URI,
         'response_type': 'code',
-        'scope': 'friends,groups',
+        'scope': [1 << 13],
     }
     url = f'https://oauth.vk.com/authorize?{urlencode(params)}'
     return RedirectResponse(url)
@@ -45,6 +49,7 @@ def login():
 
 @app.get("/callback")
 async def callback(code: str):
+    global fake_db
     token_url = 'https://oauth.vk.com/access_token'
     token_params = {
         'client_id': CLIENT_ID,
@@ -54,8 +59,6 @@ async def callback(code: str):
     }
     async with httpx.AsyncClient() as client:
         response = await client.get(token_url, params=token_params)
-    if response.status_code != 200:
-        print(response, response.text)
 
     access_token = response.json().get('access_token')
     user_id = response.json().get('user_id')
@@ -69,22 +72,19 @@ async def callback(code: str):
             groups_prompt += f"{groups[i].get('name')}" + " "
     except Exception as e:
         groups_prompt = None
-        print(e)
 
     wall = await agent.get_wall(user_id)
     try:
         wall = [wall[i].get("text") for i in range(len(wall))]
-        wall = str(wall)
+        wall = ' '.join(wall)
     except Exception as e:
         wall = None
-        print(e)
 
     if groups_prompt is not None:
         data = {'groups_text': groups_prompt, 'person_text': wall}
         response = requests.put(ML_URL, json=data)
         if response.status_code != 200:
-            print(response.text, data)
-            result_dict = {"data": "ошибка"}
+            result_dict = {"data": "ошибка обработки на стороне ML сервиса", "detail": response.text}
         else:
             result_dict = response.json()
     else:
@@ -93,9 +93,25 @@ async def callback(code: str):
     result_dict["profile_info"] = await agent.get_profile_info()
 
     data_json = json.dumps(result_dict, ensure_ascii=False)
-    token = jwt.encode({'data': data_json, 'exp': datetime.utcnow() + timedelta(minutes=10)}, SECRET_KEY,
+
+    user_data = {"id": user_id}
+    fake_db[user_id] = data_json
+
+    token = jwt.encode({'data': user_data, 'exp': datetime.utcnow() + timedelta(minutes=10)}, SECRET_KEY,
                        algorithm="HS256")
-    return RedirectResponse(url=f"{FRONTEND_URL}/decode-jwt/?token={token}")
+    return RedirectResponse(url=f"{FRONTEND_URL}/profile/?token={token}")
+
+
+@app.get("/get_prediction/{token}")
+async def get_prediction(token: str):
+    global fake_db
+    try:
+        decoded_jwt = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        uuid_str = decoded_jwt["data"]["id"]
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="JWT token is invalid or exceeded")
+    response = fake_db[uuid_str]
+    return {"data": response}
 
 
 if __name__ == "__main__":

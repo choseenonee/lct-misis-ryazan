@@ -31,6 +31,7 @@ class OutputModel(BaseModel):
     preds: Dict
     sum_group: str
     sum_pers: Union[str, None] = None
+    sum_pers_nums: Union[Dict, None] = None
 
 
 model = ml.ProfModel(modelBERT=ml.modelBERT, tokenizer_pers=ml.tokenizer_pers, model_pers=ml.model_pers,
@@ -38,10 +39,15 @@ model = ml.ProfModel(modelBERT=ml.modelBERT, tokenizer_pers=ml.tokenizer_pers, m
 
 
 @app.put("/get_predict", response_model=OutputModel)
-def get_predict(data: InputModel):
-    print(data.person_text)
-    data = model.predict(data.groups_text, data.person_text)
-    return {"preds": data[0], "sum_group": data[1], "sum_pers": data[2]}
+def get_predict(raw_data: InputModel):
+    print(raw_data.model_dump())
+    data = model.predict(raw_data.groups_text, raw_data.person_text)
+    if raw_data.person_text is not None:
+        sum_pers_nums = model.personality_detection(raw_data.person_text)
+    else:
+        sum_pers_nums = None
+    response_data = {"preds": data[0], "sum_group": data[1], "sum_pers": data[2], "sum_pers_nums": sum_pers_nums}
+    return response_data
 
 
 if __name__ == "__main__":

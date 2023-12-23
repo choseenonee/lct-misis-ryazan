@@ -18,12 +18,14 @@ class ApiAgent():
         return groups
 
     async def get_wall(self, id, count=5):
-        url = f"https://api.vk.ru/method/wall.get?owner_id=-{id}&count={count}&access_token={self.access_token}&v={self.v}"
+        url = f"https://api.vk.ru/method/wall.get?owner_id={id}&count={count}&access_token={self.access_token}&v={self.v}"
+        print("ACCESS TOKEN", self.access_token, self.user_id)
         async with httpx.AsyncClient() as client:
             response = await client.get(url)
+        print(response.json())
         if response.json().get("response") is not None:
-            print(response.json())
-            print(response.json().get("response"))
+            # print(response.json())
+            # print(response.json().get("response"))
             post_ids = response.json().get("response").get("items")
         else:
             post_ids = None
